@@ -9,7 +9,10 @@ load_dotenv()
 class Config:
     DEBUG = False
     TESTING = False
+    SECRET_KEY = os.getenv("SECRET_KEY")
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
     API_TITLE = "Flask API"
     API_VERSION = "v1"
     OPENAPI_VERSION = "3.0.2"

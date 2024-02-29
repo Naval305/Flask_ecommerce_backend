@@ -1,0 +1,1 @@
+Ecommerce with 3 services user management(Flask), product management(FastAPI), order management(DRF).
