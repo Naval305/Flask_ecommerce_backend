@@ -1,7 +1,11 @@
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, Field, constr
 
 
 class CategoryCreateSchema(BaseModel):
-    name: constr(max_length=30)
+    name: str = Field(max_length=40)
     status: bool = True
     parent_id: str = None
+
+
+class CategoryModel(BaseModel):
+    name: str

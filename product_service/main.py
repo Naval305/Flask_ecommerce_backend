@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.routers.product_routers import product_router
 from app.routers.catergory_routers import catergory_router
 
-app = FastAPI(docs_url="/api/docs", redoc_url="/api/redoc")
+app = FastAPI(docs_url="/swagger-ui", redoc_url="/redoc")
 
 try:
     import pymongo

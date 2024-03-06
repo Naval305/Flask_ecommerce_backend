@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import List
 
 sys.path.append(f"{os.getcwd()}/fastapi_env/lib/python3.10/site-packages")
 
@@ -8,7 +9,7 @@ from pymongo.errors import PyMongoError
 
 from app.db.database import db
 from app.schemas.custom_response import CustomResponse
-from app.schemas.product_schemas import ProductCreateSchema
+from app.schemas.product_schemas import ProductCreateSchema, ProductModel
 
 
 router = APIRouter()
@@ -74,11 +75,71 @@ async def create_product(product: ProductCreateSchema):
         )
 
 
-@router.get("/get-list")
+@router.get("/list", response_model=List[ProductModel])
 async def get_product_list():
-    pass
+    """
+    Fetch all documents from the 'products' collection.
+
+    Returns:
+    - List of product documents.
+
+    Example Response:
+    ```json
+    [
+        {
+            "name": "Product1",
+            "sku": "1234",
+            "description": "Description1",
+            "price": 500.0,
+            "quantity": 10,
+            "status": True,
+            "is_featured": False,
+            "category": {"name": "Category1", "id": "1234567890"}
+        },
+        {
+            "name": "Product2",
+            "sku": "5678",
+            "description": "Description2",
+            "price": 750.0,
+            "quantity": 5,
+            "status": True,
+            "is_featured": True,
+            "category": {"name": "Category2", "id": "0987654321"}
+        },
+        ...
+    ]
+    ```
+
+    Possible Errors:
+    - 500 Internal Server Error: If there's an issue with the server.
+    """
+    try:
+        products = await db["products"].find().to_list(length=None)
+        return products
+    except PyMongoError as mongo_error:
+        return CustomResponse(
+            status_code=500, message="MongoDB Error", exception=mongo_error
+        )
+    except Exception as e:
+        return CustomResponse(
+            status_code=500, message="Internal Server Error", exception=e
+        )
 
 
-@router.get("/get/{product_id}")
-async def get_product():
-    pass
+@router.get("/get/{sku}", response_model=ProductModel)
+async def get_product(sku: str):
+    try:
+        product = await db["products"].find_one({"sku": sku})
+        if not product:
+            return CustomResponse(
+                message="Product with provided sku not found", status_code=404
+            )
+        return product
+    except PyMongoError as mongo_error:
+        return CustomResponse(
+            status_code=500, message="MongoDB Error", exception=mongo_error
+        )
+    except Exception as e:
+        return CustomResponse(
+            status_code=500, message="Internal Server Error", exception=e
+        )

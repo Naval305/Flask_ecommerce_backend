@@ -12,3 +12,14 @@ class ProductCreateSchema(BaseModel):
     status: bool = True
     is_featured: bool = False
     category: str = None
+
+
+class ProductModel(BaseModel):
+    name: str
+    sku: str
+    description: str
+    price: float
+    quantity: int
+    status: bool
+    is_featured: bool
+    category: dict
