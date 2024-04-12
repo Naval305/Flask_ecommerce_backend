@@ -1,22 +1,33 @@
+import json
 import os
 import sys
 from typing import List
 
 sys.path.append(f"{os.getcwd()}/fastapi_env/lib/python3.10/site-packages")
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks, Request, Depends
 from pymongo.errors import PyMongoError
 
 from app.db.database import db
 from app.schemas.custom_response import CustomResponse
 from app.schemas.product_schemas import ProductCreateSchema, ProductModel
+from app.utils.auth_producer import ConnectUserService
+from app.utils.utils import cache
+from app.services.product_services import product_list, product_item
 
 
 router = APIRouter()
+connect_user_service = ConnectUserService()
 
 
 @router.post("/create")
-async def create_product(product: ProductCreateSchema):
+@cache(timeout=300)
+async def create_product(
+    product: ProductCreateSchema,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authenticated=Depends(connect_user_service.publish_token_to_queue),
+):
     """
     Create a new product.
 
@@ -42,6 +53,9 @@ async def create_product(product: ProductCreateSchema):
 
     """
     try:
+        if not authenticated:
+            return CustomResponse(status_code=401, message="Unauthenticated")
+
         product_data = product.model_dump()
         category = product_data["category"]
 
@@ -76,46 +90,22 @@ async def create_product(product: ProductCreateSchema):
 
 
 @router.get("/list", response_model=List[ProductModel])
-async def get_product_list():
-    """
-    Fetch all documents from the 'products' collection.
+@cache(timeout=300)
+async def get_product_list(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authenticated: bool = Depends(connect_user_service.publish_token_to_queue),
+):
 
-    Returns:
-    - List of product documents.
-
-    Example Response:
-    ```json
-    [
-        {
-            "name": "Product1",
-            "sku": "1234",
-            "description": "Description1",
-            "price": 500.0,
-            "quantity": 10,
-            "status": True,
-            "is_featured": False,
-            "category": {"name": "Category1", "id": "1234567890"}
-        },
-        {
-            "name": "Product2",
-            "sku": "5678",
-            "description": "Description2",
-            "price": 750.0,
-            "quantity": 5,
-            "status": True,
-            "is_featured": True,
-            "category": {"name": "Category2", "id": "0987654321"}
-        },
-        ...
-    ]
-    ```
-
-    Possible Errors:
-    - 500 Internal Server Error: If there's an issue with the server.
-    """
     try:
-        products = await db["products"].find().to_list(length=None)
-        return products
+        if not authenticated:
+            return CustomResponse(status_code=401, message="Unauthenticated")
+
+        products = await product_list()
+        for item in products:
+            item["_id"] = str(item["_id"])
+
+        return CustomResponse(data=products)
     except PyMongoError as mongo_error:
         return CustomResponse(
             status_code=500, message="MongoDB Error", exception=mongo_error
@@ -127,14 +117,24 @@ async def get_product_list():
 
 
 @router.get("/get/{sku}", response_model=ProductModel)
-async def get_product(sku: str):
+@cache(timeout=200)
+async def get_product(
+    sku: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authenticated=Depends(connect_user_service.publish_token_to_queue),
+):
     try:
-        product = await db["products"].find_one({"sku": sku})
+        if not authenticated:
+            return CustomResponse(status_code=401, message="Unauthenticated")
+
+        product = await product_item(sku)
         if not product:
             return CustomResponse(
                 message="Product with provided sku not found", status_code=404
             )
-        return product
+        product["_id"] = str(product["_id"])
+        return CustomResponse(data=product)
     except PyMongoError as mongo_error:
         return CustomResponse(
             status_code=500, message="MongoDB Error", exception=mongo_error

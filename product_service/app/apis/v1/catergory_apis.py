@@ -1,18 +1,24 @@
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pymongo.errors import PyMongoError
 
 from app.db.database import db
 from app.schemas.custom_response import CustomResponse
 from app.schemas.category_schemas import CategoryCreateSchema, CategoryModel
+from app.utils.auth_producer import ConnectUserService
+from app.services.category_service import category_create, get_category_list
 
 
 router = APIRouter()
+connect_user_service = ConnectUserService()
 
 
 @router.post("/create")
-async def create_category(category: CategoryCreateSchema, request: Request,):
+async def create_category(
+    category: CategoryCreateSchema,
+    authenticated=Depends(connect_user_service.publish_token_to_queue),
+):
     """
     Create a new category.
 
@@ -36,11 +42,16 @@ async def create_category(category: CategoryCreateSchema, request: Request,):
 
     """
     try:
-        token = request.headers.get("token")
+        if not authenticated:
+            return CustomResponse(status_code=401, message="Unauthenticated")
+
+        user_details = authenticated
         category_data = category.model_dump()
-        breakpoint()
-        category_data["created_by"] = {"id": 1, "email": "user1@gmail.com"}
-        result = await db["category"].insert_one(category_data)
+        category_data["created_by"] = {
+            "id": user_details["identity"],
+            "email": user_details["email"],
+        }
+        result = await category_create(category_data)
         return CustomResponse(
             message="Category Created",
             data={"category_id": str(result.inserted_id)},
@@ -49,11 +60,15 @@ async def create_category(category: CategoryCreateSchema, request: Request,):
     except PyMongoError as mongo_error:
         return CustomResponse(message="MongoDB Error", exception=mongo_error)
     except Exception as e:
-        return CustomResponse(message="Internal Server Error", exception=e, status_code=500)
+        return CustomResponse(
+            message="Internal Server Error", exception=e, status_code=500
+        )
 
 
 @router.get("/list", response_model=List[CategoryModel])
-async def category_list():
+async def category_list(
+    authenticated=Depends(connect_user_service.publish_token_to_queue),
+):
     """
     Fetch all documents from the 'category' collection.
 
@@ -79,7 +94,10 @@ async def category_list():
     - 500 Internal Server Error: If there's an issue with the server.
     """
     try:
-        categories = await db["category"].find().to_list(length=None)
+        if not authenticated:
+            return CustomResponse(status_code=401, message="Unauthenticated")
+
+        categories = await get_category_list()
         return categories
     except PyMongoError as mongo_error:
         return CustomResponse(

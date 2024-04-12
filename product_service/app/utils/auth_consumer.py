@@ -1,39 +1,27 @@
-import json
 import pika
 
-from config.config import (
+from app.config.config import (
     rabbitmq_host,
+    rabbitmq_password,
     rabbitmq_port,
     rabbitmq_user,
-    rabbitmq_password,
-    rabbitmq_token_exchange,
-    rabbitmq_token_queue,
-    rabbitmq_token_routing_key,
     rabbitmq_feedback_exchange,
     rabbitmq_feedback_queue,
     rabbitmq_feedback_routing_key,
 )
-from app.utils.users import authenticate
+from app.utils.redis import init_sync_redis
 
 
-class AuthenticateToken:
+class ConnectUserService:
     def __init__(self) -> None:
         credentials = pika.PlainCredentials(
             username=rabbitmq_user, password=rabbitmq_password
         )
-        parameters = pika.ConnectionParameters(
+        self.parameters = pika.ConnectionParameters(
             host=rabbitmq_host, port=rabbitmq_port, credentials=credentials
         )
-        self.connection = pika.BlockingConnection(parameters=parameters)
+        self.connection = pika.BlockingConnection(parameters=self.parameters)
         self.channel = self.connection.channel()
-
-        self.channel.exchange_declare(exchange=rabbitmq_token_exchange)
-        self.channel.queue_declare(queue=rabbitmq_token_queue)
-        self.channel.queue_bind(
-            queue=rabbitmq_token_queue,
-            exchange=rabbitmq_token_exchange,
-            routing_key=rabbitmq_token_routing_key,
-        )
 
         self.channel.exchange_declare(exchange=rabbitmq_feedback_exchange)
         self.channel.queue_declare(queue=rabbitmq_feedback_queue)
@@ -44,19 +32,17 @@ class AuthenticateToken:
         )
 
     def callback(self, channel, method, properties, body) -> None:
-        data = authenticate(body)
-        print(data)
-        self.channel.basic_publish(
-            exchange=rabbitmq_feedback_exchange,
-            routing_key=rabbitmq_feedback_routing_key,
-            body=json.dumps(data),
-        )
+        print(body)
+        redis = init_sync_redis()
+        redis.set("verified", body, 60)
 
     def consume(self) -> None:
         self.channel.basic_consume(
-            queue=rabbitmq_token_queue, on_message_callback=self.callback, auto_ack=True
+            queue=rabbitmq_feedback_queue,
+            on_message_callback=self.callback,
+            auto_ack=True,
         )
-        print("Consuming...")
+        print("FastAPI Consuming...")
 
         try:
             self.channel.start_consuming()
@@ -69,4 +55,4 @@ class AuthenticateToken:
             raise
 
 
-AuthenticateToken().consume()
+ConnectUserService().consume()
