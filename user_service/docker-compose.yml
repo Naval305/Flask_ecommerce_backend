@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  db:
+    container_name: "flask_db"
+    image: mysql:8.3.0
+    ports:
+      - '3307:3306'
+    env_file:
+      - .env
+    environment:
+      - MYSQL_DATABASE=${DOCKER_DB_NAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - flask_database_vol:/var/lib/mysql
+    command: [ 'mysqld' ]
+
+  flask_server:
+    container_name: "flask_backend"
+    build: .
+    expose:
+      - '5000'
+    env_file:
+      - .env
+    environment:
+      - DB_NAME=${DOCKER_DB_NAME}
+      - DB_HOST=${DOCKER_DB_HOST}
+    volumes:
+      - ./app:/docker_app/app
+      - ./config:/docker_app/config
+    depends_on:
+      - db
+
+volumes:
+  flask_database_vol:
