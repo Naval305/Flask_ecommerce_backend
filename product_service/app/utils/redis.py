@@ -1,10 +1,12 @@
 from redis import asyncio as aioredis
 import redis
 
+from app.config.config import redis_host
+
 
 def init_redis_pool():
     redis = aioredis.from_url(
-        "redis://localhost", encoding="utf8", decode_responses=True
+        f"redis://{redis_host}", encoding="utf8", decode_responses=True
     )
     return redis
 
@@ -24,5 +26,5 @@ class RedisService:
 
 
 def init_sync_redis():
-    conn = redis.from_url("redis://localhost")
+    conn = redis.from_url(f"redis://{redis_host}")
     return conn

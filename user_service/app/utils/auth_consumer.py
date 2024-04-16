@@ -1,5 +1,10 @@
 import json
+import os
 import pika
+import sys
+
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from config.config import (
     rabbitmq_host,
@@ -44,6 +49,7 @@ class AuthenticateToken:
         )
 
     def callback(self, channel, method, properties, body) -> None:
+        print("yes")
         data = authenticate(body)
         print(data)
         self.channel.basic_publish(

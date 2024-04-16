@@ -1,4 +1,4 @@
-version: '2.26'
+version: '3.8'
 
 services:
   mongo_db:
@@ -11,17 +11,36 @@ services:
       - .env
     volumes:
       - mongodb_vol:/data/db
+    networks:
+      - microservices
 
   rabbitmq:
     image: rabbitmq:3.9.13
     restart: always
-    container_name: rabbitmq_cont
+    container_name: rabbitmq_container
     ports:
       - "5673:5672"
       - "15673:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: full_access
-      RABBITMQ_DEFAULT_PASS: s3crEt
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-log:/var/log/rabbitmq
+    networks:
+      - microservices
+
+  redis:
+    container_name: 'redis_container'
+    image: 'redis:6.0.16'
+    ports:
+      - '6378:6379'
+    environment:
+      - REDIS_HOST=${DOCKER_REDIS_HOST}
+    volumes:
+      - 'redisdata:/data'
+    networks:
+      - microservices
 
   fastapi_server:
     container_name: "fastapi_backend"
@@ -40,6 +59,17 @@ services:
     depends_on:
       - mongo_db
       - rabbitmq
+      - redis
+    networks:
+      - microservices
 
 volumes:
   mongodb_vol:
+  redisdata:
+  rabbitmq-data:
+  rabbitmq-log:
+
+networks:
+  microservices:
+    external: true
+    driver: bridge

@@ -10,6 +10,9 @@ db_name = os.getenv("DB_NAME")
 db_host = os.getenv("DB_HOST")
 db_port = int(os.getenv("DB_PORT"))
 
+# redis
+redis_host = os.getenv("REDIS_HOST")
+
 # rabbitmq
 rabbitmq_host = os.getenv("RABBITMQ_HOST")
 rabbitmq_port = os.getenv("RABBITMQ_PORT")
